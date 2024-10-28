@@ -1,6 +1,7 @@
 from llama_index.core import SimpleDirectoryReader, VectorStoreIndex, StorageContext, load_index_from_storage
 from llama_index.core import PromptTemplate, Settings
 from llama_index.llms.openai import OpenAI
+from pathlib import Path
 import os
 import streamlit as st
 import random
@@ -17,19 +18,21 @@ import random
 # - in a conda env: 'conda env config vars set OPENAI_API_KEY=api_key', then 'conda deactivate', then 'conda activate {env_name}'
 # run script with : streamlit run app.py
 
-DATA_DIR = "./data"
-INDEX_DIR = "./storage"
-LLM_MODEL_NAME = "gpt-4o-mini"
+DATA_DIR = "/Users/tat/dev-local/gustave/data"
+INDEX_DIR = "/Users/tat/dev-local/gustave/storage"
+LLM_MODEL_NAME = "gpt-4o"
+TEMPERATURE = 1
+TOP_P = 1
 
-llm = OpenAI(model = LLM_MODEL_NAME)
+llm = OpenAI(model = LLM_MODEL_NAME, temperature = TEMPERATURE, top_p = TOP_P)
 Settings.llm = llm
 
 # to also change the embedding model:
 
-#from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-#embedding_name = "OrdalieTech/Solon-embeddings-base-0.1"
-#embed_model = HuggingFaceEmbedding(model_name=embedding_name)
-#Settings.embed_model = embed_model
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+embedding_name = "OrdalieTech/Solon-embeddings-base-0.1"
+embed_model = HuggingFaceEmbedding(model_name=embedding_name)
+Settings.embed_model = embed_model
 
 @st.cache_data
 def load_index():
@@ -42,7 +45,7 @@ def load_index():
 
     """
     if not os.path.exists(INDEX_DIR):
-        documents = SimpleDirectoryReader(DATA_DIR).load_data()
+        documents = SimpleDirectoryReader(input_dir=DATA_DIR, recursive=True).load_data()
         index = VectorStoreIndex.from_documents(documents)
         index.storage_context.persist(persist_dir=INDEX_DIR)
     else:
@@ -57,19 +60,26 @@ def prepare_template():
     Prepare a prompt template for the QA system.
     """
     text_qa_template_str = """
-    Tu es Gourou Fabulus, un être omniscient et bienveillant qui a atteint l’illumination suprême
-    en étudiant la psychologie évolutionnaire.
-    Tu réponds aux questions de tes disciples, en les tutoyant et en les appelant « Cher disciple ».
+    %%% CONTEXTE
+	GUSTAVE est un extraordinaire customer service manager avec plus de 20 ans d'expérience. 
+    GUSTAVE répond aux questions posées sur le forum du logiciel dokos qui est un fork du logiciel ERPNext. 
+    GUSTAVE est cordial et aime aussi faire la conversation avec les utilisateurs quand leurs questions sont plus larges.
+    
+    Pour info Dokos est très similaire à ERPNext bien qu'il présente des spécificités, notamment sur la partie comptable plus adaptée à la France.
+    GUSTAVE est sympa et pertinent. GUSTAVE comprend le code et GUSTAVE comprend les attentes de l'utilisateur et les problèmes qu'il pourrait rencontrer.
+    GUSTAVE adore le rock, en particulier le groupe AC/DC et aurait aimé faire une carrière dans la musique plutôt que dans l'informatique.
+
+	Dans la suite, agis comme GUSTAVE et réponds comme GUSTAVE répondrait à chaque interaction.
+	
     L’un d’eux t’a posé cette question : {query_str}
-    Voilà tout ce que tu sais à ce sujet :
+    Voilà tout ce que tu sais sur ce sujet :
     --------
     {context_str}
     --------
-    À partir de ces connaissances à toi, et uniquement à partir d’elles, réponds en français à la question.
     Écris une réponse claire et concise.
     """
-    if random.random() < 0.5:
-        text_qa_template_str += "Termine par une blague sur la géologie."
+    if random.random() < 0.9:
+        text_qa_template_str += "Termine par une citation inspirante venant de paroles d'un morceau de rock en anglais."
     qa_template = PromptTemplate(text_qa_template_str)
     return qa_template
 
@@ -77,8 +87,8 @@ def prepare_template():
 st.markdown("""
             <img src='https://homofabulus.com/wp-content/uploads/2023/04/logo2-100x100.png' style='display: block; margin-left: auto; margin-right: auto; width: 60px;'>
             <div style='text-align: center;'>
-            <h1>Gourou Fabulus</h1>
-            <h5>Coach, mentor, ami & compte Tipeee</h5>
+            <h1>Gustave</h1>
+            <h5>Expert es-dokos</h5>
             </div>
             """
             , unsafe_allow_html=True)
@@ -91,10 +101,10 @@ if "messages" not in st.session_state:
 if prompt := st.chat_input("Que veux-tu savoir, humain ?"):
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-gouroufabulus_filepath = "media/gourou.png"
+miniature_filepath = "media/gustave.jpg"
 # Display chat messages with appropriate avatars
 for message in st.session_state.messages:
-    with st.chat_message(message["role"], avatar=gouroufabulus_filepath if message["role"] == "assistant" else '💰'):
+    with st.chat_message(message["role"], avatar=miniature_filepath if message["role"] == "assistant" else '💰'):
         st.write(message["content"])
 
 
@@ -102,18 +112,16 @@ qa_template = prepare_template()
 query_engine = index.as_query_engine(text_qa_template=qa_template, similarity_top_k=2)
 
 if st.session_state.messages[-1]["role"] == "user":
-    with st.chat_message("assistant", avatar=gouroufabulus_filepath):
-        with st.spinner("Vous avez osé sortir Gourou Fabulus de son sommeil ! Patientez deux secondes le temps qu’il se réveille"):
+    with st.chat_message("assistant", avatar=miniature_filepath):
+        with st.spinner("Attendez, j'ai la gueule de bois après le concert de hier soir"):
             response = query_engine.query(prompt)
         if response:
-            # get source files used to generate the answer, and link to the corresponding youtube videos:
+            # get source files used to generate the answer, and link to the corresponding forum post:
             source_files = [node.metadata['file_name'] for node in response.source_nodes]
             source_files = list(set(source_files))
-            text_to_add = "\n\nTu pourras peut-être trouver plus d’infos dans ces vidéos (peut-être, j’ai pas vérifié):"
+            text_to_add = f"\n\nTu pourras peut-être trouver plus d’infos sur ce poste (peut-être, j’ai pas vérifié): {source_files}"
             for i, file in enumerate(source_files):
-                video_id = file[-18:-7]
-                video_url = f"https://www.youtube.com/watch?v={video_id}"
-                text_to_add += f"\n<a href='{video_url}' target='_blank'>{file[11:-19].replace('_', ' ')}</a>"
+                post_url = file[:-4]
                 if i < len(source_files) - 1:
                     text_to_add += " ou"
             st.markdown(response.response + text_to_add, unsafe_allow_html=True)
