@@ -1,6 +1,7 @@
 from llama_index.core import SimpleDirectoryReader, VectorStoreIndex, StorageContext, load_index_from_storage
 from llama_index.core import PromptTemplate, Settings
 from llama_index.llms.openai import OpenAI
+from index import load_index
 from pathlib import Path
 import os
 import streamlit as st
@@ -35,7 +36,7 @@ embed_model = HuggingFaceEmbedding(model_name=embedding_name)
 Settings.embed_model = embed_model
 
 @st.cache_data
-def load_index():
+def load_index(index_dir, data_dir):
     """
     Load or create an index from documents in the specified directory.
 
@@ -44,16 +45,16 @@ def load_index():
     index from storage.
 
     """
-    if not os.path.exists(INDEX_DIR):
+    if not os.path.exists(index_dir):
         documents = SimpleDirectoryReader(input_dir=DATA_DIR, recursive=True).load_data()
         index = VectorStoreIndex.from_documents(documents)
-        index.storage_context.persist(persist_dir=INDEX_DIR)
+        index.storage_context.persist(persist_dir=index_dir)
     else:
-        storage_context = StorageContext.from_defaults(persist_dir=INDEX_DIR)
+        storage_context = StorageContext.from_defaults(persist_dir=index_dir)
         index = load_index_from_storage(storage_context)
     return index
 
-index = load_index()
+index = load_index(INDEX_DIR, DATA_DIR)
 
 def prepare_template():
     """
